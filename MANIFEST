@@ -1,0 +1,6 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+t/HTML-Writer.t
+lib/HTML/Writer.pm
