@@ -5,6 +5,7 @@ use XML::Writer;
 use XML::DTDParser;
 use LWP::Simple;
 use File::Slurp;
+use Carp qw(croak);
 
 use Exporter;
 our @ISA = qw(Exporter);
@@ -84,6 +85,9 @@ sub _elem {
 sub _attr {
     my ($attr_name, $val) = @_;
     $attr_name =~ s/_/-/g;
+    my $parent = $__frag->[0];
+    croak "Illegal attribute '$attr_name' in '$parent'"
+        unless $DTD->{lc $parent}->{attributes}->{$attr_name};
     push @{$__frag->[1]}, [$attr_name, $val];
     undef;
 }
