@@ -9,7 +9,7 @@ use strict;
 use warnings;
 BEGIN { use lib 't' }
 use Test::More tests => 1;
-BEGIN { use_ok('HTML::Writer') };
+BEGIN { use_ok('HTML::Writer','xhtml1-transitional.dtd') };
 
 #########################
 
