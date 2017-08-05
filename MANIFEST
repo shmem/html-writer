@@ -3,4 +3,5 @@ Makefile.PL
 MANIFEST
 README
 t/HTML-Writer.t
+t/xhtml1-transitional.dtd
 lib/HTML/Writer.pm
