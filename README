@@ -1,16 +1,97 @@
 HTML-Writer version 0.01
 ========================
 
-The README is used to introduce the module and provide instructions on
-how to install the module, any machine dependencies it may have (for
-example C compilers and installed libraries) and any other information
-that should be provided before the module is installed.
+This module implements a DSL (domain specific language) for writing
+(X)HTML files.
 
-A README file is required for CPAN modules since CPAN extracts the
-README file from a module distribution so that people browsing the
-archive can use it get an idea of the modules uses. It is usually a
-good idea to provide version information here so that people can
-decide whether fixes for the module are worth downloading.
+It parses a DTD file (default xhtml1-transitional.dtd, included in this
+package) and sets up functions for entities and attributes found in the
+DTD. Entity functions are all uppercase, while attribute functions have
+a trailing underscore. Each function takes a code reference as its first
+argument.
+
+All DTD generated functions are exported, as well as t() which just returns
+its text, and the render() function, which constructs the HTML from its
+BLOCK argument. A second numeric argument indicates the amount of spaces
+used for indentation.
+
+After including HTML::Writer via use() - not via require - it is possible
+to write HTML/XHTML/xml as if it were perl, with interspersed valid perl
+code.
+
+    use HTML::Writer qw(xhtml1-transitional.dtd);
+    my $foo = "very foo";
+    my $bar = "bar foot";
+    sub baz { "bazaar & cathedral" }
+    render {
+        HTML {
+            HEAD {
+                TITLE { "foo bar"};
+            };
+            BODY {
+                class_ "ugly";
+                onload_ "javascript: mumble()";
+                DIV {
+                    class_ "foo";
+                    id_    "bar";
+                    t      "If in doubt, mumble.";
+                    # shape_ "bullet"; # <--- this would croak
+                    IMG { src_ "foo.jpg" };
+                };
+                TABLE {
+                    my $c;
+                    for ($foo, $bar, baz) {
+                        TR {
+                            TD { $_ }; TD { $c++};
+                        }
+                    }
+                };
+                DIV { class_ "bar"; t "End of that." };
+                A {
+                    href_ "http://perlmonks.org";
+                    t "Perl Monks Website";
+                    name_ "PerlMonks";
+                    title_ "PM";
+                };
+            }
+        };
+    };
+
+HTML::Writer croaks if attributes are found inside an entity block which
+is illegal as per DTD.
+
+The resulting HTML file is printed to STDOUT in void context, returned
+as a string in scalar context, or returned as a list of lines in array
+context. The above code produces:
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html>
+  <head>
+    <title>foo bar</title>
+  </head>
+  <body class="ugly" onload="javascript: mumble()">
+    <div class="foo" id="bar">If in doubt, mumble.
+      <img src="foo.jpg"></img>
+    </div>
+    <table>
+      <tr>
+        <td>very foo</td>
+        <td>0</td>
+      </tr>
+      <tr>
+        <td>bar foot</td>
+        <td>1</td>
+      </tr>
+      <tr>
+        <td>bazaar &amp; cathedral</td>
+        <td>2</td>
+      </tr>
+    </table>
+    <div class="bar">End of that.</div>
+    <a href="http://perlmonks.org" name="PerlMonks" title="PM">Perl Monks Website</a>
+  </body>
+</html>
 
 INSTALLATION
 
@@ -25,7 +106,10 @@ DEPENDENCIES
 
 This module requires these other modules and libraries:
 
-  yadda yadda yadda
+   XML::Writer
+   XML::DTDParser
+   LWP::Simple
+   File::Slurp
 
 COPYRIGHT AND LICENCE
 
