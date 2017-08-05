@@ -15,14 +15,14 @@ our $VERSION = 0.001;
 our $DTD; # DTD structure, to trap errors e.g. illegal attributes
 # default DTD file
 my $dtdfile = "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd";
-my $dtdtype;
+my $public;
+my $system;
 
 our $__frag = ''; # XXX how _not_ make that a package global?
 
 sub import {
     my $package = shift;
     $dtdfile = shift if $_[0];
-    $dtdfile =~ /(\w+)\.dtd/ && ($dtdtype = ucfirst($1));
     my $dtd;
     if($dtdfile =~ /^http:\/\//) {
         $dtd = get($dtdfile);
@@ -34,6 +34,8 @@ sub import {
             }
         }
     }
+    $dtd =~ /^\s+PUBLIC\s+"([^"]+)"/ms and $public = $1;
+    $dtd =~ /^\s+SYSTEM\s+"([^"]+)"/ms and $system = $1;
     $dtd =~ s/.*=== Imported Names =+-->//s; # trap 'die' in XML::DTDParser
     $DTD = ParseDTD $dtd or die "$!";
     my $elems = [ map { uc($_) } keys %$DTD ];
@@ -97,10 +99,8 @@ sub t ($) { push @{$__frag->[2]}, @_ }
 sub render_via_xml_writer {
     my $doc = shift;
     my $writer = XML::Writer->new(@_);  # extra args go to ->new()
-    $writer->doctype( "html",
-        "-//W3C//DTD XHTML 1.0 $dtdtype//EN",
-        $dtdfile
-    ) if 0;
+    $writer->doctype( "HTML", $public, $system )
+        if $public and $system;
     _render($writer,$doc);
     $writer->end();
     undef $__frag;
