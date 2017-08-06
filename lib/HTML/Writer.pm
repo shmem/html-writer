@@ -7,20 +7,78 @@ use LWP::Simple;
 use File::Slurp;
 use Carp qw(croak);
 
-use Exporter;
-our @ISA = qw(Exporter);
-our @EXPORT;
 our $VERSION = 0.001;
 
 our $DTD; # DTD structure, to trap errors e.g. illegal attributes
+our %loaded; # hash for remembering loaded DTDs
+
 # default DTD file
 my $dtdfile = "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd";
-my $public;
-my $system;
+
+my $public;     # PUBLIC part of DOCTYPE
+my $system;     # SYSTEM part of DOCTYPE
+my $vocabulary; # function ref hash for each DTD
+my $savedcode;  # hash with saved subroutine references 
 
 our $__frag = ''; # XXX how _not_ make that a package global?
 
 sub import {
+    my $package = shift;
+    my $caller  = (caller)[0];
+    my $dtd;
+    if (@_) {
+        $dtd = shift;
+        $package->init($dtd) unless $loaded{$dtd};
+    }
+    if ($^H{"HTML::Writer/dtd"} && $dtd) {
+        # unimport current DTD if $dtd to import isn't current
+        __PACKAGE__->unimport unless $^H{"HTML::Writer/dtd"} eq $dtd;
+    }
+    if($^H{"HTML::Writer/dtd"} || $dtd) {
+        $dtd = $^H{"HTML::Writer/dtd"};
+        no strict 'refs';
+        # functions derived from DTD
+        for(keys %{$vocabulary->{$dtd}}) {
+            my $sub = $caller."::$_";
+            no warnings 'prototype';
+            if (*{$sub}{CODE}) {
+                $savedcode->{$caller}->{$_} = *{$sub}{CODE};
+            }
+            my $fn = __PACKAGE__."::$_";
+            if(/_$/){
+                *{$sub} = sub ($) { $fn->(@_) };
+            } else {
+                *{$sub} = sub (&) { $fn->(@_) };
+            }
+        }
+        # regular functions to export
+        # XXX should be treated as above
+        for (qw(t render)) {
+            my $sub = $caller."::$_";
+            if (*{$sub}{CODE}) {
+                $savedcode->{$caller}->{$_} = *{$sub}{CODE};
+            }
+            *{$sub} = \&{$_};
+        }
+        $^H{"HTML::Writer/dtd"} = $dtdfile;
+    }
+    $^H{"HTML::Writer/in_effect"} = 1;
+}
+sub unimport {
+    my $package = shift;
+    my $caller  = (caller)[0];
+    # we might be called from import() to release current DTD
+    $caller eq __PACKAGE__ and $caller = (caller(1))[0];
+    for (keys %{$vocabulary->{$^H{"HTML::Writer/dtd"}}}) {
+        no strict 'refs';
+        delete ${$caller.'::'}{$_};
+        if($savedcode->{$caller}->{$_}) {
+            *{$caller.'::'.$_} = $savedcode->{$caller}->{$_};
+        }
+    }
+    $^H{"HTML::Writer/in_effect"} = 0;
+}
+sub init {
     my $package = shift;
     $dtdfile = shift if $_[0];
     my $dtd;
@@ -44,25 +102,25 @@ sub import {
     grep { s/-/_/g; ! $s{$_}++ }
         map { keys %{$DTD->{$_}->{'attributes'}} } keys %$DTD
     ];
-    define_vocabulary($elems,$attrs);
-    HTML::Writer->export_to_level(1,$package);
+    define_vocabulary($dtdfile,$elems,$attrs);
+    $loaded{$dtdfile}++;
 } 
 
 sub define_vocabulary {
     no strict "refs";
-    my($elems, $attrs) = @_;
+    my($dtdfile, $elems, $attrs) = @_;
     for (@$elems) {
         my $name = $_;
-        *{$_} = sub(&) { _elem($name, @_) };
+        my $sub = sub(&) { _elem($name, @_) };
+        # *{$_} = $sub;
+        $vocabulary->{$dtdfile}->{$_} = $sub;
     }
     for (@$attrs) {
         my $name = $_;
-        *{$_."_"} = sub($) { _attr($name, @_) };
+        my $sub = sub($) { _attr($name, @_) };
+        # *{$_."_"} = $sub;
+        $vocabulary->{$dtdfile}->{$_.'_'} = $sub;
     }
-    push(@EXPORT,
-        qw(render t ),
-        @$elems, map {$_.'_'} @$attrs
-    );
 }
 
 # root fragment
@@ -138,6 +196,16 @@ sub render(&;$) {
         return $wantarray == 0 ? $output : split /\n/, $output;
     }
     print $output;
+}
+our $AUTOLOAD;
+sub AUTOLOAD {
+    $AUTOLOAD =~ s/.*:://;
+    my ($caller,$line,$hinthash) = (caller(1))[0,2,10];
+    if ($hinthash->{"HTML::Writer/in_effect"}) {
+        goto &{$vocabulary->{$hinthash->{"HTML::Writer/dtd"}}->{$AUTOLOAD}};
+    } else {
+        goto &{$savedcode->{$caller}->{$AUTOLOAD}};
+    }
 }
 1;
 __END__
