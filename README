@@ -1,5 +1,7 @@
-HTML-Writer version 0.01
+HTML-Writer version 0.001
 ========================
+
+WARNING: This module is very beta yet.
 
 This module implements a DSL (domain specific language) for writing
 (X)HTML files.
@@ -10,19 +12,26 @@ DTD. Entity functions are all uppercase, while attribute functions have
 a trailing underscore. Each function takes a code reference as its first
 argument.
 
-All DTD generated functions are exported, as well as t() which just returns
-its text, and the render() function, which constructs the HTML from its
-BLOCK argument. A second numeric argument indicates the amount of spaces
-used for indentation.
+HTML::Writer works as a pragma. It calls the DTD generated functions only
+if it is in effect in the current scope. To that end, it imports those
+functions at compile time. Subroutines with conflicting names are saved
+and restored with a 'no HTML::Writer' call.
 
-After including HTML::Writer via use() - not via require - it is possible
+After including HTML::Writer via use($dtd) - not via require - it is possible
 to write HTML/XHTML/xml as if it were perl, with interspersed valid perl
 code.
+
+The first 'use' call loads HTML::Writer and makes it parse the passed DTD.
+A subsequent 'use' call is needed to turn on HTML::Writer in the current
+scope. Example:
 
     use HTML::Writer qw(xhtml1-transitional.dtd);
     my $foo = "very foo";
     my $bar = "bar foot";
     sub baz { "bazaar & cathedral" }
+    no HTML::Writer;
+    sub DIV { print "Divertimento finished\n"; }
+    use HTML::Writer;
     render {
         HTML {
             HEAD {
@@ -56,6 +65,8 @@ code.
             }
         };
     };
+    no HTML::Writer;
+    DIV();
 
 HTML::Writer croaks if attributes are found inside an entity block which
 is illegal as per DTD.
@@ -92,6 +103,7 @@ context. The above code produces:
     <a href="http://perlmonks.org" name="PerlMonks" title="PM">Perl Monks Website</a>
   </body>
 </html>
+Divertimento finished
 
 INSTALLATION
 
